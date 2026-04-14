@@ -350,7 +350,7 @@ export const usePuterStore = create<PuterStore>((set, get) => {
                     ],
                 },
             ],
-            { model: "claude-3-7-sonnet" }
+            // Use Puter default model (project/account dependent).
         ) as Promise<AIResponse | undefined>;
     };
 
