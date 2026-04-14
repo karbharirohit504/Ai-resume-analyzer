@@ -94,6 +94,16 @@ export const resumes: Resume[] = [
 export const AIResponseFormat = `
       interface Feedback {
       overallScore: number; //max 100
+      jdMatch?: {
+        score: number; //max 100 - match to the provided job description
+        matchedKeywords: string[]; //10-25 keywords supported by the resume
+        missingKeywords: string[]; //10-25 important keywords from the JD missing in the resume
+        missingRequirements: {
+          requirement: string;
+          priority: "must-have" | "nice-to-have";
+          howToAddress: string; //concrete resume edits (bullets/skills/projects) to address it
+        }[]; //3-6 items
+      };
       ATS: {
         score: number; //rate based on ATS suitability
         tips: {
@@ -138,19 +148,25 @@ export const AIResponseFormat = `
 export const prepareInstructions = ({
                                         jobTitle,
                                         jobDescription,
+                                        resumeText,
                                     }: {
     jobTitle: string;
     jobDescription: string;
+    resumeText?: string;
 }) =>
     `You are an expert in ATS (Applicant Tracking System) and resume analysis.
-  Please analyze and rate this resume and suggest how to improve it.
+  Please analyze and rate this resume against the provided job description and suggest how to improve it.
   The rating can be low if the resume is bad.
   Be thorough and detailed. Don't be afraid to point out any mistakes or areas for improvement.
   If there is a lot to improve, don't hesitate to give low scores. This is to help the user to improve their resume.
-  If available, use the job description for the job user is applying to to give more detailed feedback.
-  If provided, take the job description into consideration.
+  Use the job description as the primary reference for what to prioritize.
+  Only claim a keyword/requirement is matched if it is clearly supported by the resume text (do not assume).
+  The ATS score must reflect how well the resume matches this specific job description (keywords + requirements).
+  If a job description is provided, always include the jdMatch section.
+  Do not return a score of 0 unless you truly cannot extract any resume text; if text is missing, explain that via missingRequirements/howToAddress.
   The job title is: ${jobTitle}
   The job description is: ${jobDescription}
+  ${resumeText ? `Resume text (OCR from the first page image; may be incomplete): ${resumeText}` : ""}
   Provide the feedback using the following format: ${AIResponseFormat}
   Return the analysis as a JSON object, without any other text and without the backticks.
-  Do not include any other text or comments.`;
+  Do not include any other text or comments.`; 

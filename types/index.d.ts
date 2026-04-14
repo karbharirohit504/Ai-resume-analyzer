@@ -16,6 +16,16 @@ interface Resume {
 
 interface Feedback {
     overallScore: number;
+    jdMatch?: {
+        score: number; //max 100 - how well the resume matches the provided job description
+        matchedKeywords: string[]; //keywords/skills clearly supported by the resume
+        missingKeywords: string[]; //important keywords/skills from the JD that are not evidenced in the resume
+        missingRequirements: {
+            requirement: string;
+            priority: "must-have" | "nice-to-have";
+            howToAddress: string;
+        }[]; //3-6 items
+    };
     ATS: {
         score: number;
         tips: {

@@ -38,7 +38,7 @@ const ATS: React.FC<ATSProps> = ({ score, suggestions }) => {
             <div className="flex items-center gap-4 mb-6">
                 <img src={iconSrc} alt="ATS Score Icon" className="w-12 h-12" />
                 <div>
-                    <h2 className="text-2xl font-bold">ATS Score - {score}/100</h2>
+                    <h2 className="text-2xl font-bold">ATS Score (for this JD) - {score}/100</h2>
                 </div>
             </div>
 

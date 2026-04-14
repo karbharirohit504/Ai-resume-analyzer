@@ -6,6 +6,48 @@ export interface PdfConversionResult {
     error?: string;
 }
 
+export async function extractPdfText(
+    file: File,
+    {
+        maxPages = 2,
+        maxChars = 6000,
+    }: { maxPages?: number; maxChars?: number } = {}
+): Promise<string> {
+    try {
+        if (typeof window === "undefined") return "";
+
+        if (pdfjsLib?.GlobalWorkerOptions) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        const pageCount = Math.min(maxPages, pdf.numPages || 1);
+        let out = "";
+
+        for (let i = 1; i <= pageCount; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = (content.items as Array<{ str?: string }>)
+                .map((it) => (typeof it?.str === "string" ? it.str : ""))
+                .join(" ")
+                .replace(/[ \t]{2,}/g, " ")
+                .trim();
+
+            if (pageText) {
+                out += (out ? "\n\n" : "") + pageText;
+                if (out.length >= maxChars) break;
+            }
+        }
+
+        if (out.length > maxChars) out = out.slice(0, maxChars);
+        return out.trim();
+    } catch {
+        return "";
+    }
+}
+
 export async function convertPdfToImage(file: File): Promise<PdfConversionResult> {
     try {
         if (typeof window === "undefined") {

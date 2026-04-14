@@ -19,6 +19,7 @@ In short: **upload resume → AI feedback → persist results → review later**
   - A PNG preview of the resume (first page) generated client-side and stored in Puter filesystem.
   - Metadata + feedback stored in Puter key-value store (`puter.kv.*`).
 - **AI analysis**: call Puter AI chat API with the uploaded file + an instruction prompt; response is parsed as JSON feedback.
+- **JD-based scoring**: analysis explicitly includes a **Job Description match** section (keywords + requirements) and the app shows an **ATS score for this JD** based on that match score.
 - **UI pages**:
   - Home: shows previously analyzed resumes (cards).
   - Upload: form + file uploader + progress states.
@@ -49,9 +50,15 @@ Routes are defined in `app/routes.ts` (React Router v7 route config):
   - On “Analyze”:
     1) Upload the PDF to Puter FS.
     2) Convert PDF page 1 → PNG in the browser (pdf.js).
+    3) Extract resume text to improve JD matching:
+       - Try **PDF text extraction** (first 1–2 pages via pdf.js text content).
+       - If the PDF is scanned/image-based (little/no text), fall back to **OCR** on the generated first-page PNG using `puter.ai.img2txt`.
     3) Upload PNG to Puter FS.
     4) Write a KV record `resume:<uuid>` with paths + job info.
-    5) Call AI feedback using the file path + prompt.
+    5) Call AI feedback using the file path + a prompt that:
+       - Treats the job description as the primary reference.
+       - Includes an explicit `jdMatch` section (matched/missing keywords + missing requirements).
+       - Uses extracted resume text as an additional hint (especially helpful for scanned PDFs).
     6) Parse JSON and update KV record with `feedback`.
     7) Navigate to `/resume/<uuid>`.
 
@@ -59,8 +66,13 @@ Routes are defined in `app/routes.ts` (React Router v7 route config):
   - Loads resume record from KV.
   - Reads PDF + PNG blobs from Puter FS, creates object URLs, and renders:
     - `Summary` (overall and category scores)
-    - `ATS` (ATS score and tips)
+    - `JD Match` (how well the resume matches the provided job description: score + matched/missing keywords + top gaps)
+    - `ATS` (shown as “ATS Score (for this JD)”; uses `jdMatch.score` when available)
     - `Details` (accordion with detailed tips)
+  - Also shows:
+    - The exact job title/company + job description used for analysis
+    - Extracted resume text (when available) for debugging
+    - Raw feedback JSON (debug panel)
 
 - `/wipe` → `app/routes/wipe.tsx`
   - Debug route to list Puter FS entries and delete them; also flushes KV.
@@ -74,10 +86,16 @@ Types are declared (globally) in `types/index.d.ts`:
   - `resumePath` (Puter FS path to the PDF blob)
   - `imagePath` (Puter FS path to generated preview PNG)
   - `companyName`, `jobTitle` (optional)
+  - `jobDescription` (captured from upload form)
+  - `resumeTextHint` (extracted PDF text or OCR hint, used to improve JD-based matching; optional)
   - `feedback` (structured analysis)
 
 - `Feedback` is a JSON-like structure with:
   - `overallScore`
+  - `jdMatch` (optional):
+    - `score` (0–100 match to the provided job description)
+    - `matchedKeywords` / `missingKeywords`
+    - `missingRequirements` (must-have / nice-to-have + how to address)
   - `ATS`, `toneAndStyle`, `content`, `structure`, `skills` (each has scores + tips)
 
 The prompt template enforcing this JSON format lives in `constants/index.ts`.
@@ -155,6 +173,7 @@ From `package.json`:
 - `@react-router/serve`: production server runner (`react-router-serve`).
 - `zustand`: app state for Puter integration and auth/files/kv/ai wrappers.
 - `pdfjs-dist`: PDF rendering and page-to-canvas conversion.
+  - Also used for lightweight PDF text extraction (first pages) to help JD-based scoring.
 - `react-dropzone`: file selection UI for PDF.
 - `clsx`, `tailwind-merge`: ergonomic class composition and Tailwind conflict resolution.
 - `isbot`: typically used for bot detection in SSR environments (mostly used internally by React Router).
@@ -190,7 +209,7 @@ Top-level:
 - `app/components/*`: reusable UI components for feedback display and upload.
 - `app/lib/*`: helpers:
   - `puter.ts`: Zustand store wrapping Puter APIs.
-  - `pdf2img.ts`: PDF first-page → PNG conversion.
+  - `pdf2img.ts`: PDF first-page → PNG conversion + PDF text extraction.
   - `utils.ts`: `cn()`, `formatSize()`, `generateUUID()`.
 - `app/app.css`: Tailwind + custom utilities and component classes.
 
@@ -282,4 +301,3 @@ docker run -p 3000:3000 ai-resume-analyser
   - If the Puter websocket/API is blocked by a network, VPN, or browser privacy settings, uploads/kv/ai may fail.
 - AI output is expected to be **strict JSON** based on the template in `constants/index.ts`.
   - If the model returns non-JSON, the upload page will show an error and ask to retry/shorten prompt.
-

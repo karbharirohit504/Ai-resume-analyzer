@@ -4,6 +4,7 @@ import {usePuterStore} from "~/lib/puter";
 import Summary from "~/components/Summary";
 import ATS from "~/components/ATS";
 import Details from "~/components/Details";
+import JDMatch from "~/components/JDMatch";
 
 export const meta = () => ([
     { title: 'Resumind | Review ' },
@@ -16,6 +17,12 @@ const Resume = () => {
     const [imageUrl, setImageUrl] = useState('');
     const [resumeUrl, setResumeUrl] = useState('');
     const [feedback, setFeedback] = useState<Feedback | null>(null);
+    const [jobInfo, setJobInfo] = useState<{
+        companyName?: string;
+        jobTitle?: string;
+        jobDescription?: string;
+        resumeTextHint?: string;
+    }>({});
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -43,6 +50,12 @@ const Resume = () => {
             setImageUrl(imageUrl);
 
             setFeedback(data.feedback);
+            setJobInfo({
+                companyName: data.companyName,
+                jobTitle: data.jobTitle,
+                jobDescription: data.jobDescription,
+                resumeTextHint: data.resumeTextHint,
+            });
             console.log({resumeUrl, imageUrl, feedback: data.feedback });
         }
 
@@ -58,7 +71,7 @@ const Resume = () => {
     </Link>
     </nav>
     <div className="flex flex-row w-full max-lg:flex-col-reverse">
-    <section className="feedback-section bg-[url('/images/bg-small.svg') bg-cover h-[100vh] sticky top-0 items-center justify-center">
+    <section className="feedback-section bg-[url('/images/bg-small.svg')] bg-cover h-[100vh] sticky top-0 items-center justify-center">
         {imageUrl && resumeUrl && (
             <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-wxl:h-fit w-fit">
             <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
@@ -73,11 +86,74 @@ const Resume = () => {
     </section>
     <section className="feedback-section">
     <h2 className="text-4xl !text-black font-bold">Resume Review</h2>
+    {(jobInfo.companyName || jobInfo.jobTitle || jobInfo.jobDescription) ? (
+        <div className="mt-2 bg-white rounded-2xl shadow-md w-full p-4">
+            <p className="text-sm text-gray-600">
+                Target:{" "}
+                <span className="font-semibold text-gray-800">
+                    {jobInfo.jobTitle || "—"}
+                </span>
+                {jobInfo.companyName ? (
+                    <>
+                        {" "}at{" "}
+                        <span className="font-semibold text-gray-800">
+                            {jobInfo.companyName}
+                        </span>
+                    </>
+                ) : null}
+            </p>
+            {jobInfo.jobDescription ? (
+                <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-gray-700">
+                        Job description used for analysis ({jobInfo.jobDescription.length} chars)
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                        {jobInfo.jobDescription}
+                    </pre>
+                </details>
+            ) : (
+                <p className="mt-2 text-sm text-yellow-700">
+                    No job description was provided, so the analysis is more generic.
+                </p>
+            )}
+            {jobInfo.resumeTextHint ? (
+                <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-gray-700">
+                        Resume text extracted ({jobInfo.resumeTextHint.length} chars)
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                        {jobInfo.resumeTextHint}
+                    </pre>
+                </details>
+            ) : null}
+        </div>
+    ) : null}
     {feedback ? (
         <div className="flex flex-col gap-8 animate-in fade-in duration-1000">
+        {(jobInfo.jobDescription && feedback.jdMatch && feedback.jdMatch.score === 0) ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-yellow-900">
+                <p className="font-semibold">JD match is 0.</p>
+                <p className="text-sm mt-1">
+                    This commonly happens when the resume text can’t be extracted (scanned/image PDF) or there’s not enough evidence for the JD keywords.
+                    Try uploading a text-based PDF, or ensure your resume includes the JD keywords as plain text in Skills/Experience.
+                </p>
+            </div>
+        ) : null}
         <Summary feedback={feedback} />
-        <ATS score={feedback.ATS.score || 0} suggestions={feedback.ATS.tips || []} />
+        <JDMatch feedback={feedback} />
+        <ATS
+            score={(feedback.jdMatch?.score ?? feedback.ATS.score) || 0}
+            suggestions={feedback.ATS.tips || []}
+        />
     <Details feedback={feedback} />
+        <details className="bg-white rounded-2xl shadow-md w-full p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-700">
+                Debug: raw feedback JSON
+            </summary>
+            <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-700 bg-gray-50 rounded-lg p-3 overflow-x-auto">
+                {JSON.stringify(feedback, null, 2)}
+            </pre>
+        </details>
     </div>
     ) : (
         <img src="/images/resume-scan-2.gif" className="w-full" />
